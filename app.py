@@ -75,7 +75,7 @@ if submit:
         updated_df = pd.concat([existing_data, new_data], ignore_index=True)
         
         # 저장 시 모든 컬럼을 한 번 더 문자열로 변환 (에러 원천 차단)
-        conn.update(worksheet="데이터저장", data=updated_df.astype(str))
+        conn.update(data=updated_df)
         
         st.success("✅ 저장 성공! 구글 시트를 확인하세요.")
         st.balloons()
