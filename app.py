@@ -3,16 +3,15 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# 1. 페이지 설정
+# 페이지 설정
 st.set_page_config(page_title="조관 성적서 입력", page_icon="🏗️")
 
 st.title("🏗️ 조관 중간검사 성적서 입력 시스템")
-st.markdown("데이터를 입력하면 실시간으로 구글 스프레드시트에 저장됩니다.")
 
-# 2. 구글 시트 연결
+# 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. 입력 폼 시작
+# 입력 폼
 with st.form("inspection_form"):
     st.subheader("1. 기본 정보")
     col1, col2, col3 = st.columns(3)
@@ -48,10 +47,10 @@ with st.form("inspection_form"):
 
     submit = st.form_submit_button("📋 구글 시트에 저장하기")
 
-# 4. 저장 로직
+# 저장 로직
 if submit:
-    # 한글 에러 방지를 위해 모든 데이터를 문자열(str)로 강제 변환
-    new_data = pd.DataFrame([{
+    # 에러 방지를 위해 모든 데이터를 문자열로 변환
+    new_row = {
         "검사일자": str(date),
         "라인(호기)": str(line),
         "검사자": str(worker),
@@ -65,20 +64,23 @@ if submit:
         "치수_길이": str(t2),
         "판정": str(final_res),
         "비고": str(remarks)
-    }])
-
+    }
+    
     try:
-        # 데이터 불러오기 (캐시 없이 신선하게)
-        existing_data = conn.read(worksheet="데이터저장", ttl=0)
+        # 기존 데이터를 읽어오되, 오류 방지를 위해 ttl=0 설정
+        df = conn.read(worksheet="데이터저장", ttl=0)
         
-        # 기존 데이터와 새 데이터 합치기
-        updated_df = pd.concat([existing_data, new_data], ignore_index=True)
+        # 새 행 추가
+        new_data_df = pd.DataFrame([new_row])
+        updated_df = pd.concat([df, new_data_df], ignore_index=True)
         
-        # 저장 시 모든 컬럼을 한 번 더 문자열로 변환 (에러 원천 차단)
-        conn.update(data=updated_df)
+        # [핵심] 시트 업데이트 시 탭 이름을 생략하거나 명시적으로 전달
+        # 데이터프레임 전체를 다시 쓸 때 발생하는 인코딩 문제를 피하기 위해 astype(str) 사용
+        conn.update(worksheet="데이터저장", data=updated_df.astype(str))
         
-        st.success("✅ 저장 성공! 구글 시트를 확인하세요.")
+        st.success("✅ 성공적으로 저장되었습니다!")
         st.balloons()
     except Exception as e:
-        st.error(f"⚠️ 저장 중 오류가 발생했습니다: {str(e)}")
-        st.info("시트의 탭 이름이 '데이터저장'이 맞는지, 혹은 Secrets 설정이 올바른지 확인해 주세요.")
+        # 에러 메시지 분석을 위해 상세 출력
+        st.error(f"저장 중 오류 발생: {e}")
+        st.info("팁: 구글 시트의 탭 이름이 '데이터저장'이 맞는지 확인해 주세요.")
