@@ -3,33 +3,26 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# 페이지 설정
+# 1. 페이지 설정
 st.set_page_config(page_title="조관 성적서 입력", page_icon="🏗️")
 st.title("🏗️ 조관 중간검사 성적서 입력")
 
-# 구글 시트 연결
+# 2. 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 입력 폼 시작
-with st.form("inspection_form"):
+# 3. 입력 폼
+with st.form("inspection_form", clear_on_submit=True):
     st.subheader("1. 기본 정보")
     col1, col2, col3 = st.columns(3)
-    with col1:
-        date = st.date_input("검사일자", datetime.now())
-    with col2:
-        line = st.selectbox("라인(호기)", ["조관 1", "조관 2", "조관 3", "조관 4", "조관 5", "조관 6", "조관 7"])
-    with col3:
-        worker = st.text_input("검사자", value="신명재")
+    with col1: date = st.date_input("검사일자", datetime.now())
+    with col2: line = st.selectbox("라인(호기)", ["조관 1", "조관 2", "조관 3", "조관 4", "조관 5", "조관 6", "조관 7"])
+    with col3: worker = st.text_input("검사자", value="신명재")
 
     st.subheader("2. 제품 규격")
     col4, col5, col6 = st.columns(3)
-    with col4:
-        customer = st.text_input("수요가", value="태창철강")
-    with col5:
-        lot = st.text_input("스탬프LotNo")
-    with col6:
-        spec = st.text_input("제품규격", value="HR 50*50*2.0*6M")
-    
+    with col4: customer = st.text_input("수요가", value="태창철강")
+    with col5: lot = st.text_input("스탬프LotNo")
+    with col6: spec = st.text_input("제품규격", value="HR 50*50*2.0*6M")
     count = st.number_input("생산수량(본)", min_value=0, step=1)
 
     st.subheader("3. 주요 검사 및 판정")
@@ -46,11 +39,11 @@ with st.form("inspection_form"):
 
     submit = st.form_submit_button("📋 구글 시트에 저장하기")
 
-# 저장 로직
+# 4. 저장 로직
 if submit:
     try:
-        # 입력된 데이터를 시트의 영문 제목(Date, Line...)과 매칭
-        new_row = pd.DataFrame([{
+        # 데이터 생성 (시트의 열 제목과 정확히 일치해야 함)
+        new_entry = pd.DataFrame([{
             "Date": str(date),
             "Line": str(line),
             "Worker": str(worker),
@@ -66,18 +59,13 @@ if submit:
             "Note": str(remarks)
         }])
 
-        # 1. 'data' 탭의 기존 데이터 읽기
-        df = conn.read(worksheet="data", ttl=0)
+        # [핵심 수정] 기존 데이터를 읽지 않고 바로 업데이트 시도
+        # 만약 이 방법도 안되면 시트의 제목행(1행)을 모두 삭제하고 다시 작성해야 할 수도 있습니다.
+        conn.create(worksheet="data", data=new_entry)
         
-        # 2. 새 데이터 합치기
-        updated_df = pd.concat([df, new_row], ignore_index=True)
-        
-        # 3. 'data' 탭에 다시 저장
-        conn.update(worksheet="data", data=updated_df)
-        
-        st.success("✅ 성공적으로 저장되었습니다!")
+        st.success("✅ 데이터가 성공적으로 전송되었습니다!")
         st.balloons()
         
     except Exception as e:
         st.error(f"저장 실패: {e}")
-        st.info("팁: 구글 시트의 탭 이름이 정확히 'data'인지, 그리고 공유 권한이 '편집자'인지 다시 확인해 주세요.")
+        st.info("💡 해결 방법: 구글 시트의 'data' 탭에서 1행(제목행)을 제외한 나머지 빈 줄을 모두 삭제한 뒤 다시 시도해 보세요.")
