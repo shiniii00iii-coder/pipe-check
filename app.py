@@ -3,15 +3,14 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# 1. 페이지 설정
+# 페이지 설정
 st.set_page_config(page_title="조관 성적서 입력", page_icon="🏗️")
+st.title("🏗️ 조관 중간검사 성적서 입력")
 
-st.title("🏗️ 조관 중간검사 성적서 입력 시스템")
-
-# 2. 구글 시트 연결
+# 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. 입력 폼
+# 입력 폼 시작
 with st.form("inspection_form"):
     st.subheader("1. 기본 정보")
     col1, col2, col3 = st.columns(3)
@@ -47,11 +46,11 @@ with st.form("inspection_form"):
 
     submit = st.form_submit_button("📋 구글 시트에 저장하기")
 
-# 4. 저장 로직 (핵심 수정 부분)
+# 저장 로직
 if submit:
     try:
-        # 데이터 생성 (한글 에러 방지를 위해 컬럼명과 데이터를 최대한 단순화 시도)
-        new_data = pd.DataFrame([{
+        # 입력된 데이터를 시트의 영문 제목(Date, Line...)과 매칭
+        new_row = pd.DataFrame([{
             "Date": str(date),
             "Line": str(line),
             "Worker": str(worker),
@@ -67,19 +66,18 @@ if submit:
             "Note": str(remarks)
         }])
 
-        # 1단계: 기존 시트 읽기
-        # 만약 여기서 에러가 나면 시트 URL이나 Secrets 설정 문제임
-        existing_data = conn.read(worksheet="데이터저장", ttl=0)
+        # 1. 'data' 탭의 기존 데이터 읽기
+        df = conn.read(worksheet="data", ttl=0)
         
-        # 2단계: 데이터 합치기
-        updated_df = pd.concat([existing_data, new_data], ignore_index=True)
+        # 2. 새 데이터 합치기
+        updated_df = pd.concat([df, new_row], ignore_index=True)
         
-        # 3단계: 업데이트 (worksheet 인자를 직접 넣지 않고 시도)
-        conn.update(worksheet="데이터저장", data=updated_df)
+        # 3. 'data' 탭에 다시 저장
+        conn.update(worksheet="data", data=updated_df)
         
-        st.success("✅ 저장 성공! 구글 시트를 확인하세요.")
+        st.success("✅ 성공적으로 저장되었습니다!")
         st.balloons()
         
     except Exception as e:
-        st.error(f"⚠️ 저장 오류 발생: {str(e)}")
-        st.warning("도움말: 구글 시트의 첫 번째 행(제목행)이 영어로 되어 있는지 확인해 보세요. (예: Date, Line, Worker...) 한글 제목행에서 인코딩 에러가 발생할 수 있습니다.")
+        st.error(f"저장 실패: {e}")
+        st.info("팁: 구글 시트의 탭 이름이 정확히 'data'인지, 그리고 공유 권한이 '편집자'인지 다시 확인해 주세요.")
