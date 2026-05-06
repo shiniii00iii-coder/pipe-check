@@ -3,15 +3,15 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# 페이지 설정
+# 1. 페이지 설정
 st.set_page_config(page_title="조관 성적서 입력", page_icon="🏗️")
 
 st.title("🏗️ 조관 중간검사 성적서 입력 시스템")
 
-# 구글 시트 연결
+# 2. 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 입력 폼
+# 3. 입력 폼
 with st.form("inspection_form"):
     st.subheader("1. 기본 정보")
     col1, col2, col3 = st.columns(3)
@@ -29,7 +29,7 @@ with st.form("inspection_form"):
     with col5:
         lot = st.text_input("스탬프LotNo")
     with col6:
-        spec = st.text_input("제품규격(종류_등급_외경x두께x길이)", value="HR 50*50*2.0*6M")
+        spec = st.text_input("제품규격", value="HR 50*50*2.0*6M")
     
     count = st.number_input("생산수량(본)", min_value=0, step=1)
 
@@ -47,40 +47,39 @@ with st.form("inspection_form"):
 
     submit = st.form_submit_button("📋 구글 시트에 저장하기")
 
-# 저장 로직
+# 4. 저장 로직 (핵심 수정 부분)
 if submit:
-    # 에러 방지를 위해 모든 데이터를 문자열로 변환
-    new_row = {
-        "검사일자": str(date),
-        "라인(호기)": str(line),
-        "검사자": str(worker),
-        "수요가": str(customer),
-        "스탬프LotNo": str(lot),
-        "제품규격(종류_등급_외경x두께x길이)": str(spec),
-        "생산수량(본)": str(count),
-        "육안_겉모양": str(v1),
-        "육안_방청유무": str(v2),
-        "치수_두께": str(t1),
-        "치수_길이": str(t2),
-        "판정": str(final_res),
-        "비고": str(remarks)
-    }
-    
     try:
-        # 기존 데이터를 읽어오되, 오류 방지를 위해 ttl=0 설정
-        df = conn.read(worksheet="데이터저장", ttl=0)
+        # 데이터 생성 (한글 에러 방지를 위해 컬럼명과 데이터를 최대한 단순화 시도)
+        new_data = pd.DataFrame([{
+            "Date": str(date),
+            "Line": str(line),
+            "Worker": str(worker),
+            "Customer": str(customer),
+            "LotNo": str(lot),
+            "Spec": str(spec),
+            "Qty": str(count),
+            "Visual1": str(v1),
+            "Visual2": str(v2),
+            "T": str(t1),
+            "L": str(t2),
+            "Result": str(final_res),
+            "Note": str(remarks)
+        }])
+
+        # 1단계: 기존 시트 읽기
+        # 만약 여기서 에러가 나면 시트 URL이나 Secrets 설정 문제임
+        existing_data = conn.read(worksheet="데이터저장", ttl=0)
         
-        # 새 행 추가
-        new_data_df = pd.DataFrame([new_row])
-        updated_df = pd.concat([df, new_data_df], ignore_index=True)
+        # 2단계: 데이터 합치기
+        updated_df = pd.concat([existing_data, new_data], ignore_index=True)
         
-        # [핵심] 시트 업데이트 시 탭 이름을 생략하거나 명시적으로 전달
-        # 데이터프레임 전체를 다시 쓸 때 발생하는 인코딩 문제를 피하기 위해 astype(str) 사용
-        conn.update(worksheet="데이터저장", data=updated_df.astype(str))
+        # 3단계: 업데이트 (worksheet 인자를 직접 넣지 않고 시도)
+        conn.update(worksheet="데이터저장", data=updated_df)
         
-        st.success("✅ 성공적으로 저장되었습니다!")
+        st.success("✅ 저장 성공! 구글 시트를 확인하세요.")
         st.balloons()
+        
     except Exception as e:
-        # 에러 메시지 분석을 위해 상세 출력
-        st.error(f"저장 중 오류 발생: {e}")
-        st.info("팁: 구글 시트의 탭 이름이 '데이터저장'이 맞는지 확인해 주세요.")
+        st.error(f"⚠️ 저장 오류 발생: {str(e)}")
+        st.warning("도움말: 구글 시트의 첫 번째 행(제목행)이 영어로 되어 있는지 확인해 보세요. (예: Date, Line, Worker...) 한글 제목행에서 인코딩 에러가 발생할 수 있습니다.")
