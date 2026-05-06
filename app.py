@@ -80,7 +80,7 @@ if submit:
         # 데이터 합치기
         updated_df = pd.concat([existing_df, new_data], ignore_index=True)
         # 시트에 쓰기
-        conn.update(worksheet="데이터저장", data=updated_df)
+        conn.update(worksheet="데이터저장", data=updated_df.astype(str))
         st.success("✅ 데이터가 구글 시트에 실시간으로 저장되었습니다!")
         st.balloons()
     except Exception as e:
